@@ -1,0 +1,13 @@
+numpy
+pandas
+pyarrow
+scipy
+scikit-learn
+imbalanced-learn
+matplotlib
+seaborn
+duckdb
+ipykernel
+nbformat
+requests
+openpyxl

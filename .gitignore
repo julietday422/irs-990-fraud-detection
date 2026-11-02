@@ -1,0 +1,45 @@
+# Data
+data/raw/
+data/staging/
+data/cleaned/
+data/analytics/
+# Generated reports
+reports/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Models
+models/*.pkl
+models/*.joblib
+
+# macOS
+.DS_Store
+
+.jupyter/
+
+.ipynb_checkpoints/
+
+# All local datasets
+data/
+notebooks/data/
+
+# Data files anywhere in the project
+*.parquet
+*.csv
+*.feather
+*.arrow
+
+# Notebook outputs and temporary files
+.ipynb_checkpoints/
+
+# Local environments and secrets
+.env*
+.venv/
+venv/

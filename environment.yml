@@ -1,0 +1,21 @@
+name: irs990
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - pyarrow
+  - scipy
+  - scikit-learn
+  - imbalanced-learn
+  - matplotlib
+  - seaborn
+  - duckdb
+  - ipykernel
+  - nbformat
+  - requests
+  - openpyxl
