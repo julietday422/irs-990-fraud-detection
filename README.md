@@ -1,56 +1,49 @@
-# IRS Form 990: Significant Diversion of Assets Detection
+# IRS Form 990: Significant Diversion of Assets and Nonprofit Risk Analysis
 
-An end-to-end data science project using publicly available IRS Form 990 XML filings to investigate financial patterns associated with nonprofit organizations that self-report significant diversions of assets.
+An end-to-end data science research project using publicly available IRS Form 990 XML filings and historical National Center for Charitable Statistics (NCCS) data to study financial and governance patterns associated with **self-reported significant diversions of assets** and to develop exploratory nonprofit investigation-prioritization methods.
 
-The project combines large-scale XML ingestion, data quality analysis, financial feature engineering, and planned machine learning techniques to identify patterns and potential risk indicators in nonprofit financial reporting.
+**Project status (November 2026):** IRS XML ingestion, data quality assessment, financial feature engineering, historical NCCS integration, exploratory modeling, anomaly detection, investigation-queue construction, robustness checks, and a versioned 2024 baseline snapshot have been completed. The baseline remains **pending formal approval and additional validation**. An explanatory Databricks dashboard is a downstream use of the saved scores, not a reason to retrain the models.
 
-**Project status:** Data ingestion and quality assessment complete. Financial feature engineering and predictive modeling are upcoming stages.
+> **Interpretation:** A significant-diversion disclosure is self-reported; it is **not independently verified fraud**. A negative disclosure does not establish that diversion or fraud did not occur. Model scores and consensus ranks are research prioritization signals, **not calibrated probabilities of fraud, findings of misconduct, or allegations against any organization**.
 
-## 1. Project Overview
+## 1. Project overview
 
-IRS Form 990 is an annual information return filed by many tax-exempt organizations in the United States. It contains information about organizational finances, governance, operations, and compliance.
+IRS Form 990 is an annual information return for many U.S. tax-exempt organizations. Part VI, Section A, Line 5 asks whether an organization became aware of a significant diversion of its assets during the year. The XML field `MaterialDiversionOrMisuseInd` is used to derive the project's IRS diversion-disclosure outcome.
 
-Part VI, Section A, Line 5 asks whether an organization became aware of a significant diversion of its assets during the year.
+The project aims to:
 
-This project uses the corresponding XML field, `MaterialDiversionOrMisuseInd`, as the primary outcome variable.
+- Ingest and audit IRS XML filings while distinguishing **publication year** from **tax year**.
+- Identify and responsibly interpret self-reported diversion disclosures.
+- Build auditable filing- and organization-year financial and governance features.
+- Integrate historical NCCS data, measure coverage and missingness, and compare data sources.
+- Develop supervised disclosure-prediction and unsupervised peer-anomaly signals.
+- Compare transparent investigation rankings, evaluate their sensitivity, and document limitations before operational use.
 
-**Important distinction:** A positive disclosure represents a self-reported significant diversion of assets, not independently verified fraud. A negative disclosure does not establish that fraud or asset diversion did not occur.
+## 2. Data sources and scope
 
-### Project objectives
+**IRS XML:** Publication archives spanning 2023–2026, with the initial labeled full-Form-990 analysis focused on tax years 2023–2025. Publication year and tax year differ: a filing released in 2025 may report an earlier tax year. Full Form 990 is modeled separately from 990-EZ, 990-PF, and 990-T, which have different schemas and are not assigned negative diversion labels by default.
 
-- Build a reproducible pipeline for processing large volumes of IRS Form 990 XML filings.
-- Identify organizations reporting significant diversions of assets.
-- Assess data completeness, duplicate filings, and reporting inconsistencies.
-- Engineer financial and organizational features associated with diversion disclosures.
-- Explore classification, anomaly detection, entity resolution, and network analysis techniques.
-- Evaluate whether observable reporting characteristics can help identify patterns associated with diversion risk.
+**NCCS historical data:** Historical nonprofit tables covering 2010–2024, used for source audits, longitudinal features, modeling, 2024 scoring, and peer comparisons. Source coverage, label availability, and join behavior are explicitly audited; not every organization has an observed diversion-disclosure label.
 
-## 2. Data Sources
+Sources and supporting documentation:
 
-**Source:** Publicly available IRS Form 990 XML filings.
+- [IRS Form 990 series downloads](https://www.irs.gov/charities-non-profits/form-990-series-downloads)
+- [Dataset Summary and Data Quality Report](docs/DATASET_SUMMARY.md)
 
-**Target tax years:** 2023–2025
+Original ZIP archives, downloaded NCCS Parquet files, generated data, models, investigation packets, and reports are not distributed in this repository.
 
-**Publication archives:** 2023–2026
+## 3. Historical IRS ingestion and data-quality results
 
-Tax year and publication year are treated separately because organizations may file returns after the end of the tax year. A filing published in 2025, for example, may describe an organization's 2023 or 2024 tax year.
-
-The dataset is restricted to eligible full Form 990 filings containing the relevant diversion-disclosure field.
-
-The original XML archives are retained locally to support validation and additional feature extraction.
-
-## 3. Key Results
-
-The completed ingestion and data quality pipeline produced the following results:
+The completed IRS ingestion and quality assessment reported:
 
 | Metric | Result |
-|---|---:|
+| --- | ---: |
 | Original XML archives processed | 50 |
 | Filing-level records ingested | 841,900 |
 | Positive diversion disclosures | 809 |
 | Negative diversion disclosures | 841,091 |
-| Missing disclosure labels | 0 |
-| XML parsing errors | 0 |
+| Missing disclosure labels in the eligible ingested cohort | 0 |
+| XML parsing errors reported | 0 |
 | Positive disclosure rate | 0.0961% |
 | Provisional organization-year records | 829,043 |
 | Organization-year groups with conflicting labels | 16 |
@@ -60,280 +53,162 @@ The completed ingestion and data quality pipeline produced the following results
 ### Disclosure rates by tax year
 
 | Tax year | Filings | Positive disclosures | Positive rate |
-|---|---:|---:|---:|
+| --- | ---: | ---: | ---: |
 | 2023 | 359,633 | 333 | 0.0926% |
 | 2024 | 362,975 | 349 | 0.0961% |
 | 2025 | 119,292 | 127 | 0.1065% |
 
-**Key observations:**
+These are **historical results from the original processed IRS cohort**, not newly recomputed statistics or estimates of fraud prevalence. The 2025 tax-year cohort was incomplete. Canonical organization-year selection was deterministic but provisional: authoritative amendment status and final filing order were not independently verified. Sixteen conflicting-label organization-year groups were excluded from the conservative modeling candidates.
 
-- Positive diversion disclosures are extremely rare, creating a substantial class imbalance for machine learning.
-- Some organizations have multiple filings for the same tax year.
-- A small number of organization-year groups contain conflicting diversion disclosures.
-- Tax year 2025 has incomplete coverage because not all returns have been published.
-- Organization-level deduplication and careful model evaluation are essential.
+The original Notebook 00 pilot processed 5,000 XML files and identified 2,703 eligible full Form 990 filings, including one positive disclosure.
 
-These are descriptive results from the processed filing dataset and should not be interpreted as estimates of actual nonprofit fraud prevalence.
+## 4. Notebook guide
 
-## 4. Pipeline Architecture
+The repository contains **23 notebooks**, numbered 00–16 with intermediate lettered notebooks. The table describes their roles in the historical analytical workflow; it is **not an instruction to run them all**.
 
-The completed pipeline consists of three sequential Jupyter notebooks.
+| Notebook | Purpose |
+| --- | --- |
+| `00` | IRS XML feasibility, disclosure-label definition, and pilot audit |
+| `01` | Full IRS XML ingestion and archive-level validation |
+| `02` | Data quality, filing reconciliation, deduplication, and EDA |
+| `03` | Comprehensive ingestion of other 990-series XML into separate datasets |
+| `04` | Standard Form 990 financial, compensation, governance, and quality features |
+| `04B` | Form-specific features for 990-EZ, 990-PF, and 990-T |
+| `05` | Final organization-year modeling dataset assembly and quality checks |
+| `06` | Leakage-aware anomaly detection and diversion-disclosure prediction |
+| `07` | NCCS-versus-IRS data comparison |
+| `08` | NCCS historical integration, 2010–2024, and initial baselines |
+| `08A` | NCCS source and join audit |
+| `09` | Improved historical NCCS modeling and 2024 scoring |
+| `09A` | NCCS source completeness audit |
+| `09B` | Model optimization and ranking experiments |
+| `09C` | Missingness and model stabilization |
+| `09D` | Scoring-population and model-selection audit |
+| `10` | Financial and governance peer-anomaly detection |
+| `11` | Integration and comparison of risk signals and rankings |
+| `12` | Organization-level investigation queue and explanatory context |
+| `13` | Queue validation, sensitivity analysis, and review design |
+| `14` | Organization-size effects and ranking robustness |
+| `15` | Blinded case-study materials and human lead-quality review workflow |
+| `16` | Baseline evaluation, leakage audit, protected snapshot, and Databricks handoff |
 
-### Stage 1: Data Feasibility and XML Exploration
+See each notebook's opening Markdown, configuration section, and output descriptions for its specific inputs, run controls, and artifacts.
 
-**Notebook:** `00_data_feasibility_irs990_fraud.ipynb`
+## 5. Analytical methodology and interpretation
 
-Purpose: Determine whether IRS XML filings contain a usable outcome variable for studying significant diversions of assets.
+### Supervised disclosure model
 
-Key activities:
+The supervised model estimates association with **observed self-reported significant-diversion disclosures**, not independently confirmed fraud. Rare positive labels, historical coverage, selection effects, and disclosure behavior limit interpretation. Identifier- and outcome-derived fields must not be used as predictive features; organization identity is useful for grouping and leakage-aware evaluation.
 
-- Inspect IRS Form 990 XML structure and reporting fields.
-- Identify `MaterialDiversionOrMisuseInd`.
-- Define positive, negative, and missing disclosure labels.
-- Process an initial pilot sample of XML filings.
-- Evaluate label availability and class imbalance.
-- Verify a positive disclosure directly against its source XML.
+### Peer anomalies and consensus rankings
 
-The pilot processed 5,000 XML files and identified 2,703 eligible Form 990 filings, including one positive disclosure.
+The analysis also develops directional financial and governance peer indicators and explores an Isolation Forest comparison. Notebook 11 compares the supervised signal with a six-indicator directional peer score and other diagnostics. The exploratory consensus ranking uses **equal weights on supervised and peer percentiles (50% / 50%)**. Those weights have **not been validated as optimal**, and the components can share underlying financial information; they are not independent evidence of misconduct.
 
-**Outcome:** Established the feasibility of using the IRS diversion-disclosure field for further analysis.
+### Organization-level investigation queues
 
-### Stage 2: Full XML Ingestion
+Notebooks 12–15 deduplicate to the organization level, add historical and peer-relative context, compare ranking stability, assess organization-size effects, and prepare blinded review materials. The review workflow distinguishes generated case packets from **completed human judgments**. No verified lead-quality result should be inferred from an uncompleted worksheet or a model rank.
 
-**Notebook:** `01_full_xml_ingestion.ipynb`
+### Evaluation and frozen baseline
 
-Purpose: Build a scalable, reproducible ingestion process across the available IRS XML archives.
+Notebook 16 prepares the `nccs_2024_baseline_v1` technical snapshot and related evaluation and handoff artifacts. The 2023–2024 period had already been examined and is **not a pristine, untouched prospective test set**. A code-level feature-lineage review found no obvious direct outcome or future-tax-year leakage, but **publication-date validation and formal approval remain outstanding**. Feature-name screening alone cannot establish the absence of indirect leakage.
 
-Key activities:
+Organization size affects supervised rankings. Size-stratified analyses and simpler benchmarks are important context; they do not by themselves establish a better operational ranking. The frozen baseline is an **exploratory comparison baseline**, not an approved fraud-detection system.
 
-- Process 50 XML archives.
-- Extract organization identifiers, tax years, publication metadata, and disclosure labels.
-- Handle differences in ZIP compression formats, including archives requiring 7-Zip.
-- Write archive-level Parquet partitions.
-- Generate processing and validation reports.
-- Skip successfully completed archives when rerunning the pipeline.
+## 6. Current usage: inspect existing work without rerunning it
 
-**Outcome:** Created a filing-level dataset containing 841,900 records with no missing disclosure labels or reported XML parsing errors.
+**The historical analyses have already been executed, and the existing generated outputs and baseline should be treated as frozen. Do not rerun notebooks simply to view the results, prepare a dashboard, or verify that GitHub contains the code.** The notebooks committed to GitHub have their cell outputs cleared; that does **not** mean the underlying analyses were never run or that the models must be retrained.
 
-### Stage 3: Data Quality, Deduplication, and Exploratory Analysis
+For current review and dashboard work:
 
-**Notebook:** `02_data_quality_and_eda.ipynb`
+1. Read the notebooks, their Markdown findings, and `docs/DATASET_SUMMARY.md` without executing expensive cells.
+2. Use the **existing saved datasets, scores, model artifacts, and manifests** from controlled local or Databricks storage. They are intentionally excluded from GitHub.
+3. Validate schema, row counts, unique organization identifiers, version information, and artifact provenance before displaying scores.
+4. Keep investigation materials, evaluation outcomes, and restricted case profiles separate from general-purpose dashboard scoring tables.
+5. Label rankings and scores as exploratory indicators; never present them as fraud probabilities or confirmed allegations.
 
-Purpose: Assess dataset quality and construct an organization-year dataset suitable for subsequent analysis.
+GitHub is the **code and documentation repository**, not the system of record for frozen data and model artifacts. Avoid regenerating or overwriting historical exports unless a deliberate, separately documented reproduction or new baseline version is intended.
 
-Key activities:
+## 7. Historical reproduction: setup and execution
 
-- Examine filing counts and disclosure rates by tax year.
-- Compare tax years with publication years.
-- Check for repeated filing identifiers and repeated EIN–tax-year combinations.
-- Identify organizations with multiple filings.
-- Investigate conflicting diversion-disclosure labels.
-- Select provisional canonical organization-year records.
-- Create a conservative modeling candidate dataset.
-
-A canonical organization-year record is the selected representative filing for an organization and tax year.
-
-The selection uses a deterministic rule based on tax-period end, publication year, and filing ID. This is **provisional**: authoritative amendment status and final filing order have not been independently verified.
-
-The modeling candidate dataset excludes 16 organization-year groups containing conflicting disclosure labels.
-
-**Outcome:** Produced 829,027 organization-year modeling candidates, including 776 positive disclosures.
-
-## 5. Repository Structure
-
-```text
-irs-990-fraud-detection/
-├── notebooks/
-│   ├── 00_data_feasibility_irs990_fraud.ipynb
-│   ├── 01_full_xml_ingestion.ipynb
-│   └── 02_data_quality_and_eda.ipynb
-├── data/
-│   ├── raw/
-│   ├── staging/
-│   ├── cleaned/
-│   └── analytics/
-├── reports/
-│   └── ingestion/
-├── src/
-├── models/
-├── docs/
-├── README.md
-├── requirements.txt
-└── .gitignore
-```
-
-### Data directories
-
-- `data/raw/`: Original downloaded IRS XML ZIP archives.
-- `data/staging/`: Intermediate archive-level Parquet partitions and pilot outputs.
-- `data/cleaned/`: Consolidated filing-level and organization-year datasets.
-- `data/analytics/`: Data quality summaries, duplicate analyses, and conflicting-filing records.
-- `reports/`: Generated processing and ingestion reports.
-
-Large datasets and generated reports are excluded from version control. They can be regenerated locally using the pipeline, provided the required source archives are available.
-
-## 6. Installation and Setup
+**This section describes how the original pipeline can be reproduced intentionally. It is separate from current read-only usage.** Reproduction requires original source archives, NCCS files, adequate storage and memory, and careful attention to each notebook's dependencies. Some stages train models or overwrite generated artifacts.
 
 ### Prerequisites
 
-- Python 3.11
-- Conda or another compatible Python environment manager
-- JupyterLab
-- Git
-- Sufficient disk space for IRS XML archives and temporary extraction
-- 7-Zip (`7zz`) for archives using unsupported ZIP compression methods
+- Python 3.11, Git, and JupyterLab.
+- Conda or a compatible Python environment manager.
+- Disk space for IRS ZIP archives, NCCS historical Parquet files, intermediate extracts, and reports.
+- A compatible 7-Zip executable (`7zz`) for IRS archives that use unsupported compression such as Deflate64.
 
-### Clone the repository
-
-Once the project has been published to GitHub:
+### Clone and install
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/irs-990-fraud-detection.git
+git clone https://github.com/julietday422/irs-990-fraud-detection.git
 cd irs-990-fraud-detection
-```
-
-Replace `YOUR-USERNAME` with the repository owner's GitHub username.
-
-### Create the Python environment
-
-```bash
 conda create -n irs990 python=3.11 -y
 conda activate irs990
-```
-
-### Install dependencies
-
-```bash
 python -m pip install -r requirements.txt
-```
-
-The dependency list is maintained in `requirements.txt`.
-
-If JupyterLab or the notebook kernel is not included in the installed dependencies, install them with:
-
-```bash
 python -m pip install jupyterlab ipykernel
-```
-
-Register the environment as a notebook kernel:
-
-```bash
 python -m ipykernel install --user --name irs990 --display-name "Python (irs990)"
-```
-
-### Configure 7-Zip
-
-Some IRS ZIP archives use Deflate64 compression, which Python's standard `zipfile` library does not support.
-
-Install a compatible 7-Zip executable and make `7zz` available on your system PATH, or configure the ingestion notebook to reference its location.
-
-For a notebook version that supports the `SEVEN_ZIP` environment variable:
-
-```bash
-export SEVEN_ZIP="/path/to/7zz"
-```
-
-### Download the source data
-
-Download the relevant IRS Form 990 XML archives from the IRS website and place them in:
-
-```text
-data/raw/
-```
-
-Source: https://www.irs.gov/charities-non-profits/form-990-series-downloads
-
-The original XML archives are not included in this Git repository.
-
-### Run the notebooks
-
-Launch JupyterLab:
-
-```bash
 jupyter lab
 ```
 
-Select the `Python (irs990)` kernel and run the notebooks in order:
+The repository also includes `environment.yml`; consult it when setting up a Conda-managed environment. If using that file, avoid creating a second environment unnecessarily. Some notebook versions support configuring the 7-Zip path with the `SEVEN_ZIP` environment variable.
 
-1. `00_data_feasibility_irs990_fraud.ipynb`
-2. `01_full_xml_ingestion.ipynb`
-3. `02_data_quality_and_eda.ipynb`
+### Source data and execution controls
 
-Notebook 01 performs the full ingestion and can require substantial processing time and temporary disk space. Notebook 02 uses the generated Parquet partitions and consolidated data.
+Download original IRS archives from the [IRS download site](https://www.irs.gov/charities-non-profits/form-990-series-downloads) and obtain the required historical NCCS sources separately. Place them in the paths expected by the relevant notebooks; source and generated data are not included in the clone.
 
-## 7. Modeling Considerations
+**Inspect configuration before running any notebook.** Relevant safeguards in the reviewed versions include:
 
-### Class imbalance
+| Notebook | Execution safeguard or setting |
+| --- | --- |
+| `00` | `DOWNLOAD_ONE_ARCHIVE = False` by default; explicitly opt in to the pilot download |
+| `01` | `RUN_INGESTION = False` by default; `RUN_MODE` controls the ingestion scope when enabled |
+| `03` | `RUN_MODE = "test"` for limited processing; incomplete existing outputs require inspection before rerunning |
+| `04` | `RUN_EXTRACTION = False` by default; `MODE` selects repair versus full extraction when enabled |
+| `04B` | `RUN_EXTRACTION = False` by default |
+| `05` | `WRITE_OUTPUTS = False` by default; enable only for intentional exports |
+| `08` | `RUN_DOWNLOADS = False` and `WRITE_OUTPUTS = False` by default; other analysis and modeling cells may still execute |
+| `06`, `09`–`16` | Review individual cells carefully: model training, reports, rankings, case packets, or manifests may be regenerated or overwritten |
 
-Only approximately 0.096% of filing-level records contain positive disclosures.
+The notebook numbers indicate a **logical dependency history**, not a guarantee that every notebook can be run independently or safely in numerical order without restoring its inputs. Preserve historical output versions and record changes before reproducing or rebuilding anything.
 
-Accuracy alone will therefore be a misleading model evaluation metric.
+## 8. Databricks baseline and dashboard handoff
 
-Future modeling will emphasize precision, recall, precision-recall AUC, and appropriate baseline comparisons.
+The project includes a 2024 NCCS baseline prepared for controlled Databricks ingestion and comparison with future experiments. The existing Databricks environment includes the `irs_ofe_fwa_demo.nccs_demo` schema and baseline scoring assets, including `baseline_v1_scores`, `baseline_v1_limited_coverage`, and `vw_nonprofit_risk_dashboard`.
 
-### Target leakage
+The intended dashboard is **explanatory**, not a retraining workflow. It should help users understand organization-level rankings, financial and governance indicators, coverage limitations, methodology, and the differences among supervised, peer, and consensus signals.
 
-The outcome variable is derived from `MaterialDiversionOrMisuseInd`.
+For ingestion or validation, follow Notebook 16's handoff instructions: keep the outcome-free primary scoring export separate from restricted evaluation outcomes and case profiles, load limited-coverage organizations separately, verify row counts and EIN uniqueness, and retain the baseline version and file hashes. A frozen technical snapshot is **not the same as formal model approval**.
 
-Columns derived directly from the target, including `ever_positive`, `positive_filing_count`, and `distinct_labels`, must not be used as predictive features.
+## 9. Repository contents and data protection
 
-Identifiers and source metadata should also be excluded from the default feature set. EIN can be retained for organization-level grouping and train/test splitting.
+```text
+irs-990-fraud-detection/
+├── notebooks/                # 23 reviewed analysis notebooks (00–16)
+├── docs/
+│   └── DATASET_SUMMARY.md
+├── README.md
+├── requirements.txt
+├── environment.yml
+└── .gitignore
+```
 
-Features that directly reveal diversion disclosures or related follow-up information should not be included in predictive models.
+Local analysis also uses directories such as `data/`, `reports/`, and model-output locations, but generated datasets and artifacts are excluded from Git. The `.gitignore` excludes large data formats, model files, local environments, checkpoints, and generated reports. **Do not commit raw filing exports, restricted investigator packets, evaluation outcomes, credentials, or sensitive local paths.** Check staged changes before each push; `.gitignore` does not automatically untrack previously committed files.
 
-### Organization-level leakage
+## 10. Limitations and responsible use
 
-The same organization may appear in multiple tax years.
+- The target is a self-reported disclosure, **not a verified fraud event**; nondisclosure is not proof of no misconduct.
+- The positive class is rare and reporting practices may vary.
+- IRS 2025 tax-year coverage in the original cohort was incomplete; filing histories and canonical selections may be provisional.
+- NCCS source coverage, missingness, and label availability affect which organizations can be trained on, evaluated, or ranked.
+- Retrospective evaluation on previously examined years is not independent prospective validation.
+- Financial and governance indicators can reflect organization size, reporting practices, or accounting context rather than misconduct.
+- Correlated signals and unvalidated consensus weights limit interpretation.
+- Human investigative review, publication-timing validation, and formal baseline approval remain outstanding where documented in Notebook 16.
+- These analyses support exploratory research and contextual prioritization only. Independent verification is required before drawing conclusions about any specific organization.
 
-Train/test splitting should account for EIN so that repeated observations of an organization do not create misleading model performance.
+## 11. Documentation
 
-### Interpretation
-
-Predicting a contemporaneous disclosure from the same year's financial information is different from prospectively predicting future diversion events.
-
-Model objectives and evaluation designs must distinguish between these use cases.
-
-## 8. Planned Next Steps
-
-### Stage 4: Financial Feature Engineering
-
-Extract additional fields from the original IRS XML filings, including:
-
-- Revenue, expenses, assets, and liabilities
-- Net assets and financial ratios
-- Program service and fundraising expenses
-- Contributions and grants
-- Compensation-related measures
-- Year-over-year financial changes
-
-### Stage 5: Machine Learning
-
-Explore supervised classification and unsupervised anomaly detection, with evaluation strategies designed for extreme class imbalance.
-
-### Stage 6: Entity Resolution and Network Analysis
-
-Investigate relationships among organizations, officers, addresses, and other shared attributes where the available data supports reliable linkage.
-
-### Stage 7: Model Evaluation and Interpretation
-
-Evaluate predictive performance, feature importance, data limitations, and potential use cases for nonprofit financial risk analysis.
-
-## 9. Limitations
-
-- Diversion disclosures are self-reported and do not independently establish fraud.
-- Organizations reporting no diversion may still have experienced undisclosed incidents.
-- Positive labels are extremely rare.
-- The 2025 tax-year dataset is incomplete.
-- Multiple filings may reflect amendments or other filing-history complexities.
-- Canonical filing selection is provisional.
-- Financial and governance variables may be correlated with organizational size, reporting behavior, and disclosure practices rather than misconduct itself.
-- Any resulting model should be treated as a research tool, not as evidence of wrongdoing by an individual organization.
-
-## 10. Project Scope and Responsible Use
-
-This project is intended for exploratory data science research, reproducible analysis, and investigation of patterns in publicly available nonprofit filings.
-
-Its purpose is not to accuse or classify individual organizations as fraudulent. Any analytical findings should be interpreted with appropriate context, uncertainty, and independent verification.
-
-## 11. Documentation 
-[Dataset Summary and Data Quality Report](docs/DATASET_SUMMARY.md)
+- [Dataset Summary and Data Quality Report](docs/DATASET_SUMMARY.md) — historical IRS modeling dataset and quality findings.
+- [Notebooks](notebooks/) — methodology, configuration, historical analyses, evaluation, and handoff details.
